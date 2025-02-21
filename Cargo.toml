@@ -2,4 +2,4 @@
 members = [
   "bsc",
 ]
-resolver = "2"
+resolver = "3"
