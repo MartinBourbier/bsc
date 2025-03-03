@@ -1,10 +1,21 @@
 use std::str::FromStr;
+use crate::routines::apply_string_escapes;
 
 grammar;
 
-pub Term: i32 = {
+pub Term : String = {
     <n:Num> => n,
     "(" <t:Term> ")" => t,
 };
 
-Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
+pub PrimaryExpression : String = {
+  <s: StringLit> => s,
+  <t: Term> => t,
+  <id: Identifier> => id,
+};
+
+pub StringLit: String = <l:r#"["]([^"\\\n]|\\.|\\\n)*["]"#> => apply_string_escapes(&l[1..l.len()-1]);
+
+Num : String = <s:r"[0-9]+"> => String::from(s);
+
+Identifier : String = <s:r"[a-zA-Z_]+"> => String::from(s);
