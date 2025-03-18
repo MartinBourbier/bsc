@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     unsafe {
         let layout = Layout::new::<stb_lexer>();
         let ptr = std::alloc::alloc(layout) as *mut stb_lexer;
+
         stb_c_lexer_init(
             ptr,
             code.as_ptr() as *const i8,
@@ -22,8 +23,14 @@ fn main() -> Result<(), Box<dyn Error>> {
             string_store.as_mut_ptr() as *mut i8,
             store_length,
         );
-        std::alloc::dealloc(ptr as *mut u8, layout);
-    };
 
+        while stb_c_lexer_get_token(ptr) != 0 {
+            println!("{}", (*ptr).token);
+        }
+
+        std::alloc::dealloc(ptr as *mut u8, layout);
+    }
+
+    println!("{}", "End");
     Ok(())
 }
