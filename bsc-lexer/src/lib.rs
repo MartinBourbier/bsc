@@ -12,6 +12,7 @@ macro_rules! lowercase {
 pub enum LexingError {
     ForbiddenIdentifier(String),
     InvalidInteger(String),
+    UnterminatedString,
     #[default]
     InvalidToken,
 }
@@ -28,6 +29,14 @@ impl From<ParseIntError> for LexingError {
             _ => LexingError::InvalidInteger("other error".to_owned()),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum IntegerConstant {
+    INT(i32),
+    UINT(u32),
+    LONG(i64),
+    ULONG(u64),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -55,12 +64,53 @@ fn make_punctuator(punctuator: Punctuator) -> impl Fn(&mut Lexer<CToken>) -> Pun
     move |_| punctuator
 }
 
-#[derive(Logos, Debug, PartialEq)]
+// TODO: handle suffixes
+fn parse_hex(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
+    let s = lex.slice();
+    let s = s.trim_start_matches("0x").trim_start_matches("0X");
+    let res = i32::from_str_radix(s, 16).map_err(|e| e.into());
+    match res {
+        Ok(n) => Ok(IntegerConstant::INT(n)),
+        Err(e) => Err(e),
+    }
+}
+
+// TODO: handle suffixes
+fn parse_dec(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
+    let s = lex.slice();
+    let res: Result<i32, ParseIntError> = i32::from_str_radix(s, 10).map_err(|e| e.into());
+    match res {
+        Ok(n) => Ok(IntegerConstant::INT(n)),
+        Err(_) => {
+            let res = i64::from_str_radix(s, 10).map_err(|e| e.into());
+            match res {
+                Ok(n) => Ok(IntegerConstant::LONG(n)),
+                Err(e) => Err(e),
+            }
+        }
+    }
+}
+
+#[derive(Clone, Logos, Debug, PartialEq)]
 #[logos(error = LexingError)]
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
 #[logos(skip r"// [^\n]*")] // Single line comments
 // Common subpatterns
-#[logos(subpattern identifier = r"[a-zA-Z_][[:word:]]*")]
+#[logos(subpattern O = r"[0-7]")] // Octal
+#[logos(subpattern D = r"[0-9]")] // Decimal
+#[logos(subpattern NZ = r"[1-9]")] // Non-zero
+#[logos(subpattern L = r"[a-zA-Z_]")] // Letter
+#[logos(subpattern A = r"[a-zA-Z0-9_]")] // Alphanumeric
+#[logos(subpattern H = r"[0-9a-fA-F]")] // Hexadecimal
+#[logos(subpattern HP = r"0[xX]")] // Hexadecimal prefix
+#[logos(subpattern E = r"[Ee][+-]?(?&D)+")] // Exponent
+#[logos(subpattern P = r"[Pp][+-]?(?&D)+")] // Hexadecimal exponent
+#[logos(subpattern FS = r"[fFlL]")] // Floating suffix
+#[logos(subpattern IS = r"((u|U)(l|L|ll|LL)?)|((l|L|ll|LL)(u|U)?)")] // Integer suffix
+#[logos(subpattern CP = r"u|U|L")] // Character prefix
+#[logos(subpattern SP = r"u8|u|U|L")] // String prefix
+#[logos(subpattern ES = r#"\\(['"\?\\abfnrtv]|[0-7]{1,3}|x[a-fA-F0-9]+)"#)] // Escape sequence
+#[logos(subpattern WS = r"[ \t\n\f]")] // Whitespace
 pub enum CToken {
     // Keyword tokens
     #[token("auto")]
@@ -131,19 +181,37 @@ pub enum CToken {
     Volatile,
     #[token("while")]
     While,
-
-    // __func__ is reserved, as stated in section 6.4.2.2.1 of the ISO/IEC 9899.
-    // Forbid it by default
-    #[token("__func__", forbidden_identifier)]
-    FuncIdentifier,
+    #[token("_Alignas")]
+    Alignas,
+    #[token("_Alignof")]
+    Alignof,
+    #[token("_Atomic")]
+    Atomic,
+    #[token("_Bool")]
+    Bool,
+    #[token("_Complex")]
+    Complex,
+    #[token("_Generic")]
+    Generic,
+    #[token("_Imaginary")]
+    Imaginary,
+    #[token("_Noreturn")]
+    Noreturn,
+    #[token("_Static_assert")]
+    StaticAssert,
+    #[token("_Thread_local")]
+    ThreadLocal,
+    #[token("__func__")]
+    FuncName,
 
     // TODO: handle universal character names, as stated in section 6.4.3.1 of the ISO/IEC 9899
-    #[regex("[a-zA-Z_][[:word:]]*", |lex| lex.slice().to_string())]
+    #[regex("(?&L)(?&A)*", |lex| lex.slice().to_string())]
     Identifier(String),
 
     // TODO: handle oct, hex and suffixes, section 6.4.4.1 of the ISO/IEC 9899
-    #[regex("[[:digit:]]*", |lex| lex.slice().parse::<i32>())]
-    IntegerConstant(i32),
+    #[regex("(?&HP)(?&H)+(?&IS)?", parse_hex)]
+    #[regex("(?&NZ)?(?&D)+(?&IS)?", parse_dec)]
+    IntegerConstant(IntegerConstant),
 
     // TODO: handle floating constants
     // TODO: handle character constants
@@ -161,13 +229,15 @@ pub enum CToken {
     #[token("}", callback = make_punctuator(Punctuator::RBRACE))]
     #[token("%>", callback = make_punctuator(Punctuator::RBRACE))] // digraph
     Punctuator(Punctuator),
+    // TODO: handle floating constants
+    // TODO: handle strings
 }
 
 impl fmt::Display for CToken {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Identifier(id) => write!(f, "id: {}", id),
-            Self::IntegerConstant(n) => write!(f, "int: {}", n),
+            Self::IntegerConstant(n) => write!(f, "int: {:?}", n),
             _ => write!(f, "{}", lowercase!(self)),
         }
     }
@@ -215,12 +285,7 @@ mod tests {
     fn test_forbidden_identifier() {
         let mut lex = CToken::lexer("__func__");
 
-        assert_eq!(
-            lex.next(),
-            Some(Err(LexingError::ForbiddenIdentifier(
-                "__func__".to_string()
-            )))
-        );
+        assert_eq!(lex.next(), Some(Ok(CToken::FuncName)),);
 
         assert_eq!(lex.next(), None);
     }
@@ -229,12 +294,7 @@ mod tests {
     fn test_forbidden_then_valididentifier() {
         let mut lex = CToken::lexer("__func__ main");
 
-        assert_eq!(
-            lex.next(),
-            Some(Err(LexingError::ForbiddenIdentifier(
-                "__func__".to_string()
-            )))
-        );
+        assert_eq!(lex.next(), Some(Ok(CToken::FuncName)));
 
         assert_eq!(lex.next(), Some(Ok(CToken::Identifier("main".to_string()))));
 
@@ -245,8 +305,30 @@ mod tests {
     fn test_integer_constant() {
         let mut lex = CToken::lexer("42 21");
 
-        assert_eq!(lex.next(), Some(Ok(CToken::IntegerConstant(42))));
-        assert_eq!(lex.next(), Some(Ok(CToken::IntegerConstant(21))));
+        assert_eq!(
+            lex.next(),
+            Some(Ok(CToken::IntegerConstant(IntegerConstant::INT(42))))
+        );
+        assert_eq!(
+            lex.next(),
+            Some(Ok(CToken::IntegerConstant(IntegerConstant::INT(21))))
+        );
+
+        assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn test_integer_constant_hex() {
+        let mut lex = CToken::lexer("0x42 0x21");
+
+        assert_eq!(
+            lex.next(),
+            Some(Ok(CToken::IntegerConstant(IntegerConstant::INT(66))))
+        );
+        assert_eq!(
+            lex.next(),
+            Some(Ok(CToken::IntegerConstant(IntegerConstant::INT(33))))
+        );
 
         assert_eq!(lex.next(), None);
     }
