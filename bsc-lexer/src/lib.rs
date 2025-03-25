@@ -11,14 +11,25 @@ fn forbidden_identifier(lex: &mut Lexer<CToken>) -> Result<(), LexingError> {
     Err(LexingError::ForbiddenIdentifier(lex.slice().to_string()))
 }
 
+enum ConstantValue {
+    IntegerConstant(/* help */),
+    StringConstant(String),
+}
+
 #[derive(Logos, Debug, PartialEq)]
 #[logos(error = LexingError)]
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
+// Common subpatterns
 #[logos(subpattern alpha = r"[a-zA-Z]")]
 #[logos(subpattern digit = r"[0-9]")]
 #[logos(subpattern alphanum = r"(?&alpha)|(?&digit)")]
 #[logos(subpattern wordchr = r"(?&alphanum)|(_)")]
 #[logos(subpattern identifier = r"[a-zA-Z_](?&wordchr)*")]
+// Constant subpatterns
+#[logos(subpattern us = r"(u)|(U)")] // unsigned suffix
+#[logos(subpattern ls = r"(l)|(L)")] // long suffix
+#[logos(subpattern lls = r"(ll)|(LL)")] // long long suffix
+#[logos(subpatterns interger-suffix = r"((?&us)(ls)?)|((?&us)(?&lls))|((?&ls)(?&us)?)|((?&lls)(?&us)?)")]
 enum CToken {
     // Keyword tokens
     #[token("auto")]
