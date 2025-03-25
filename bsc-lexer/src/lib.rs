@@ -106,6 +106,19 @@ enum Keyword {
     While,
 }
 
+#[derive(Logos, Debug, PartialEq)]
+#[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
+enum CToken {
+    // TODO: make this produce an error. __func__ is reserved, as stated in section 6.4.2.2.1 of
+    // the ISO/IEC 9899
+    #[token("__func__")]
+    FuncIdentifier,
+
+    // TODO: handle universal character names, as stated in section 6.4.3.1 of the ISO/IEC 9899
+    #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
+    Identifier,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,6 +135,28 @@ mod tests {
 
         assert_eq!(lex.next(), Some(Ok(Keyword::Struct)));
         assert_eq!(lex.slice(), "struct");
+
+        assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn test_simple_identifiers() {
+        let mut lex = CToken::lexer("a b_ c1234_ amazing_func0 _a");
+
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier)));
+        assert_eq!(lex.slice(), "a");
+
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier)));
+        assert_eq!(lex.slice(), "b_");
+
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier)));
+        assert_eq!(lex.slice(), "c1234_");
+
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier)));
+        assert_eq!(lex.slice(), "amazing_func0");
+
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier)));
+        assert_eq!(lex.slice(), "_a");
 
         assert_eq!(lex.next(), None);
     }
