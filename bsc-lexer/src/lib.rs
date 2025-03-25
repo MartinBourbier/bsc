@@ -38,17 +38,17 @@ pub enum Punctuator {
     RPAREN, // )
     LBRACE, // {
     RBRACE, // }
-    DOT, // .
+    DOT,    // .
     LARROW, // ->
-    DPLUS, // ++
+    DPLUS,  // ++
     DMINUS, // --
-    AMP, // &
-    STAR, // *
-    PLUS, // +
-    MINUS, // -
-    TILDE, // ~
-    BANG, // !
-    // TODO: add the remaining ones, section 6.4.6 of ISO/IEC 9899
+    AMP,    // &
+    STAR,   // *
+    PLUS,   // +
+    MINUS,  // -
+    TILDE,  // ~
+    BANG,   // !
+            // TODO: add the remaining ones, section 6.4.6 of ISO/IEC 9899
 }
 
 fn make_punctuator(punctuator: Punctuator) -> impl Fn(&mut Lexer<CToken>) -> Punctuator {
@@ -160,7 +160,7 @@ pub enum CToken {
     #[token("<%", callback = make_punctuator(Punctuator::LBRACE))] // digraph
     #[token("}", callback = make_punctuator(Punctuator::RBRACE))]
     #[token("%>", callback = make_punctuator(Punctuator::RBRACE))] // digraph
-    Punctuator(Punctuator)
+    Punctuator(Punctuator),
 }
 
 impl fmt::Display for CToken {
