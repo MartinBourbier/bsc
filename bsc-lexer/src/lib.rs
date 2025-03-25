@@ -1,4 +1,4 @@
-use logos::{Logos, Lexer};
+use logos::{Lexer, Logos};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 enum LexingError {
@@ -14,6 +14,11 @@ fn forbidden_identifier(lex: &mut Lexer<CToken>) -> Result<(), LexingError> {
 #[derive(Logos, Debug, PartialEq)]
 #[logos(error = LexingError)]
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
+#[logos(subpattern alpha = r"[a-zA-Z]")]
+#[logos(subpattern digit = r"[0-9]")]
+#[logos(subpattern alphanum = r"(?&alpha)|(?&digit)")]
+#[logos(subpattern wordchr = r"(?&alphanum)|(_)")]
+#[logos(subpattern identifier = r"[a-zA-Z_](?&wordchr)*")]
 enum CToken {
     // Keyword tokens
     #[token("auto")]
@@ -91,7 +96,7 @@ enum CToken {
     FuncIdentifier,
 
     // TODO: handle universal character names, as stated in section 6.4.3.1 of the ISO/IEC 9899
-    #[regex("[a-zA-Z_][a-zA-Z0-9_]*")]
+    #[regex("(?&identifier)")]
     Identifier,
 }
 
@@ -141,7 +146,12 @@ mod tests {
     fn test_forbidden_identifier() {
         let mut lex = CToken::lexer("__func__");
 
-        assert_eq!(lex.next(), Some(Err(LexingError::ForbiddenIdentifier("__func__".to_string()))));
+        assert_eq!(
+            lex.next(),
+            Some(Err(LexingError::ForbiddenIdentifier(
+                "__func__".to_string()
+            )))
+        );
 
         assert_eq!(lex.next(), None);
     }
@@ -150,7 +160,12 @@ mod tests {
     fn test_forbidden_then_valididentifier() {
         let mut lex = CToken::lexer("__func__ main");
 
-        assert_eq!(lex.next(), Some(Err(LexingError::ForbiddenIdentifier("__func__".to_string()))));
+        assert_eq!(
+            lex.next(),
+            Some(Err(LexingError::ForbiddenIdentifier(
+                "__func__".to_string()
+            )))
+        );
 
         assert_eq!(lex.next(), Some(Ok(CToken::Identifier)));
         assert_eq!(lex.slice(), "main");
