@@ -17,10 +17,6 @@ pub enum LexingError {
     InvalidToken,
 }
 
-fn forbidden_identifier(lex: &mut Lexer<CToken>) -> Result<(), LexingError> {
-    Err(LexingError::ForbiddenIdentifier(lex.slice().to_string()))
-}
-
 impl From<ParseIntError> for LexingError {
     fn from(err: ParseIntError) -> Self {
         use std::num::IntErrorKind::*;
@@ -37,31 +33,6 @@ pub enum IntegerConstant {
     UINT(u32),
     LONG(i64),
     ULONG(u64),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Punctuator {
-    LBRACK, // [
-    RBRACK, // ]
-    LPAREN, // (
-    RPAREN, // )
-    LBRACE, // {
-    RBRACE, // }
-    DOT,    // .
-    LARROW, // ->
-    DPLUS,  // ++
-    DMINUS, // --
-    AMP,    // &
-    STAR,   // *
-    PLUS,   // +
-    MINUS,  // -
-    TILDE,  // ~
-    BANG,   // !
-            // TODO: add the remaining ones, section 6.4.6 of ISO/IEC 9899
-}
-
-fn make_punctuator(punctuator: Punctuator) -> impl Fn(&mut Lexer<CToken>) -> Punctuator {
-    move |_| punctuator
 }
 
 // TODO: handle suffixes
@@ -95,6 +66,7 @@ fn parse_dec(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
 #[logos(error = LexingError)]
 #[logos(skip r"[ \t\n\f]+")] // Ignore this regex pattern between tokens
 #[logos(skip r"// [^\n]*")] // Single line comments
+// TODO: handle multi line comments
 // Common subpatterns
 #[logos(subpattern O = r"[0-7]")] // Octal
 #[logos(subpattern D = r"[0-9]")] // Decimal
@@ -204,6 +176,106 @@ pub enum CToken {
     #[token("__func__")]
     FuncName,
 
+    // Punctuators
+    #[token("...")]
+    Ellipsis,
+    #[token(">>=")]
+    RightAssign,
+    #[token("<<=")]
+    LeftAssign,
+    #[token("+=")]
+    AddAssign,
+    #[token("-=")]
+    SubAssign,
+    #[token("*=")]
+    MulAssign,
+    #[token("/=")]
+    DivAssign,
+    #[token("%=")]
+    ModAssign,
+    #[token("&=")]
+    AndAssign,
+    #[token("^=")]
+    XorAssign,
+    #[token("|=")]
+    OrAssign,
+    #[token(">>")]
+    RightOp,
+    #[token("<<")]
+    LeftOp,
+    #[token("++")]
+    IncOp,
+    #[token("--")]
+    DecOp,
+    #[token("->")]
+    PtrOp,
+    #[token("&&")]
+    AndOp,
+    #[token("||")]
+    OrOp,
+    #[token("<=")]
+    LeOp,
+    #[token(">=")]
+    GeOp,
+    #[token("==")]
+    EqOp,
+    #[token("!=")]
+    NeOp,
+
+    // Misc
+    #[token(";")]
+    SemiColon,
+    #[token("{")]
+    #[token("<%")]
+    LeftBrace,
+    #[token("}")]
+    #[token("%>")]
+    RightBrace,
+    #[token(",")]
+    Comma,
+    #[token(":")]
+    Colon,
+    #[token("=")]
+    Eq,
+    #[token("(")]
+    LeftParen,
+    #[token(")")]
+    RightParen,
+    #[token("[")]
+    #[token("<:")]
+    LeftBracket,
+    #[token("]")]
+    #[token(":>")]
+    RightBracket,
+    #[token(".")]
+    Dot,
+    #[token("&")]
+    Amp,
+    #[token("!")]
+    Bang,
+    #[token("~")]
+    Tilde,
+    #[token("-")]
+    Minus,
+    #[token("+")]
+    Plus,
+    #[token("*")]
+    Star,
+    #[token("/")]
+    Slash,
+    #[token("%")]
+    Percent,
+    #[token("<")]
+    LeftCaret,
+    #[token(">")]
+    RightCaret,
+    #[token("^")]
+    Caret,
+    #[token("|")]
+    Pipe,
+    #[token("?")]
+    Question,
+
     // TODO: handle universal character names, as stated in section 6.4.3.1 of the ISO/IEC 9899
     #[regex("(?&L)(?&A)*", |lex| lex.slice().to_string())]
     Identifier(String),
@@ -216,19 +288,6 @@ pub enum CToken {
     // TODO: handle floating constants
     // TODO: handle character constants
     // TODO: handle string literals
-
-    // TODO: handle the other ones
-    #[token("[", callback = make_punctuator(Punctuator::LBRACK))]
-    #[token("<:", callback = make_punctuator(Punctuator::LBRACK))] // digraph
-    #[token("]", callback = make_punctuator(Punctuator::RBRACK))]
-    #[token(":>", callback = make_punctuator(Punctuator::RBRACK))] // digraph
-    #[token("(", callback = make_punctuator(Punctuator::LPAREN))]
-    #[token(")", callback = make_punctuator(Punctuator::RPAREN))]
-    #[token("{", callback = make_punctuator(Punctuator::LBRACE))]
-    #[token("<%", callback = make_punctuator(Punctuator::LBRACE))] // digraph
-    #[token("}", callback = make_punctuator(Punctuator::RBRACE))]
-    #[token("%>", callback = make_punctuator(Punctuator::RBRACE))] // digraph
-    Punctuator(Punctuator),
     // TODO: handle floating constants
     // TODO: handle strings
 }
@@ -337,10 +396,10 @@ mod tests {
     fn test_punctuators_brackets() {
         let mut lex = CToken::lexer("[ <: :> ]");
 
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::LBRACK))));
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::LBRACK))));
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::RBRACK))));
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::RBRACK))));
+        assert_eq!(lex.next(), Some(Ok(CToken::LeftBracket)));
+        assert_eq!(lex.next(), Some(Ok(CToken::LeftBracket)));
+        assert_eq!(lex.next(), Some(Ok(CToken::RightBracket)));
+        assert_eq!(lex.next(), Some(Ok(CToken::RightBracket)));
 
         assert_eq!(lex.next(), None);
     }
@@ -349,10 +408,10 @@ mod tests {
     fn test_punctuators_braces() {
         let mut lex = CToken::lexer("{ <% %> }");
 
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::LBRACE))));
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::LBRACE))));
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::RBRACE))));
-        assert_eq!(lex.next(), Some(Ok(CToken::Punctuator(Punctuator::RBRACE))));
+        assert_eq!(lex.next(), Some(Ok(CToken::LeftBrace)));
+        assert_eq!(lex.next(), Some(Ok(CToken::LeftBrace)));
+        assert_eq!(lex.next(), Some(Ok(CToken::RightBrace)));
+        assert_eq!(lex.next(), Some(Ok(CToken::RightBrace)));
 
         assert_eq!(lex.next(), None);
     }
@@ -373,6 +432,29 @@ mod tests {
         assert_eq!(lex.next(), Some(Ok(CToken::Identifier("some".to_string()))));
         assert_eq!(lex.next(), Some(Ok(CToken::Identifier("ids".to_string()))));
         assert_eq!(lex.next(), Some(Ok(CToken::Identifier("main".to_string()))));
+
+        assert_eq!(lex.next(), None);
+    }
+
+    #[test]
+    fn test_program_full() {
+        let mut lex = CToken::lexer("int main(void) {\nint answer = 42; return answer; }");
+
+        assert_eq!(lex.next(), Some(Ok(CToken::Int)));
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier("main".to_string()))));
+        assert_eq!(lex.next(), Some(Ok(CToken::LeftParen)));
+        assert_eq!(lex.next(), Some(Ok(CToken::Void)));
+        assert_eq!(lex.next(), Some(Ok(CToken::RightParen)));
+        assert_eq!(lex.next(), Some(Ok(CToken::LeftBrace)));
+        assert_eq!(lex.next(), Some(Ok(CToken::Int)));
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier("answer".to_string()))));
+        assert_eq!(lex.next(), Some(Ok(CToken::Eq)));
+        assert_eq!(lex.next(), Some(Ok(CToken::IntegerConstant(IntegerConstant::INT(42)))));
+        assert_eq!(lex.next(), Some(Ok(CToken::SemiColon)));
+        assert_eq!(lex.next(), Some(Ok(CToken::Return)));
+        assert_eq!(lex.next(), Some(Ok(CToken::Identifier("answer".to_string()))));
+        assert_eq!(lex.next(), Some(Ok(CToken::SemiColon)));
+        assert_eq!(lex.next(), Some(Ok(CToken::RightBrace)));
 
         assert_eq!(lex.next(), None);
     }
