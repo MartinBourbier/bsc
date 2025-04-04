@@ -1,19 +1,17 @@
 mod wrapper;
 
 use std::error::Error;
-use wrapper::{Lexer, stb_c_lexer_get_token};
+use wrapper::Lexer;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let code = "int a = 0;";
+    let code = "int main(void) { int a = 8; return a; }";
 
     {
         let lexer = Lexer::new(code);
 
         // Get token not yet wrapped
-        unsafe {
-            while stb_c_lexer_get_token(lexer.ptr) != 0 {
-                println!("{}", (*lexer.ptr).token);
-            }
+        while lexer.next_token() != 0 {
+            println!("{}", lexer.get_token());
         }
     } // Lexer implements Drop trait, so everything should be freed here
 
