@@ -9,10 +9,12 @@ fn main() {
     let headers_path = libdir_path.join("stb_c_lexer.h");
     let headers_path_str = headers_path.to_str().expect("Path is not a valid string");
 
-    let obj_path = libdir_path.join("stb_c_lexer.o");
-    let lib_path = libdir_path.join("libstb_c_lexer.a");
+    let outdir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let obj_path = outdir.join("stb_c_lexer.o");
+    let lib_path = outdir.join("libstb_c_lexer.a");
 
     println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
+    println!("cargo:rustc-link-search={}", outdir.to_str().unwrap());
 
     println!("cargo:rustc-link-lib=stb_c_lexer");
 
