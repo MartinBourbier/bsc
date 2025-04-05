@@ -9,7 +9,27 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
 #[repr(u32)]
 pub enum Token {
-    SINGLE_CHAR, // 0..255
+    // Single chars
+    ADD = ('+' as u32),
+    MINUS = ('-' as u32),
+    DIV = ('/' as u32),
+    MUL = ('*' as u32),
+    MOD = ('%' as u32),
+    ASSIGN = ('=' as u32),
+    AMP = ('&' as u32),
+    PIPE = ('|' as u32),
+    XOR = ('^' as u32),
+    GT = ('>' as u32),
+    LT = ('<' as u32),
+    COLON = (',' as u32),
+    SCOLON = (';' as u32),
+    LPAR = ('(' as u32),
+    RPAR = (')' as u32),
+    LBRAC = ('[' as u32),
+    RBRAC = (']' as u32),
+    LCBRAC = ('{' as u32),
+    RCBRAC = ('}' as u32),
+    // ! single chars
     EOF = 256,
     PARSE_ERROR = 257,
     INTLIT = 258,
@@ -40,7 +60,7 @@ pub enum Token {
     EQARROW = 283,
     SHLEQ = 284,
     SHREQ = 285,
-    FIRST_UNUSED_TOKEN = 286,
+    FIRST_UNUSED_TOKEN = 286, // ?
 }
 
 impl Display for Token {
@@ -49,7 +69,25 @@ impl Display for Token {
             f,
             "{}",
             match self {
-                Token::SINGLE_CHAR => String::from("SINGLE_CHAR"),
+                Token::COLON => String::from(","),
+                Token::SCOLON => String::from(";"),
+                Token::LPAR => String::from("("),
+                Token::RPAR => String::from(")"),
+                Token::LBRAC => String::from("["),
+                Token::RBRAC => String::from("]"),
+                Token::LCBRAC => String::from("{"),
+                Token::RCBRAC => String::from("}"),
+                Token::ADD => String::from("+"),
+                Token::MINUS => String::from("-"),
+                Token::DIV => String::from("/"),
+                Token::MUL => String::from("*"),
+                Token::MOD => String::from("%"),
+                Token::ASSIGN => String::from("="),
+                Token::AMP => String::from("&"),
+                Token::PIPE => String::from("|"),
+                Token::XOR => String::from("^"),
+                Token::GT => String::from(">"),
+                Token::LT => String::from("<"),
                 Token::EOF => String::from("EOF"),
                 Token::PARSE_ERROR => String::from("PARSE_ERROR"),
                 Token::INTLIT => String::from("INTLIT"),
@@ -125,10 +163,7 @@ impl Lexer {
     }
 
     fn token_from_bindgen(tok_id: _bindgen_ty_1) -> Token {
-        match tok_id {
-            0..255 => Token::SINGLE_CHAR,
-            _ => unsafe { transmute(tok_id) },
-        }
+        unsafe { transmute(tok_id) }
     }
 
     pub fn get_token(&self) -> Token {
