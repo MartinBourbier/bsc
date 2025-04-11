@@ -3,6 +3,9 @@ use std::{fmt::Debug, ops::Range};
 #[cfg(feature = "dummy")]
 pub mod dummy;
 
+#[cfg(feature = "logos")]
+pub mod logos;
+
 /// An enum representing the different kinds of lexing errors.
 ///
 /// Note that we do not store any data within the variants as
