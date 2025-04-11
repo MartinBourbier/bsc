@@ -7,7 +7,7 @@
 //! - ...and many others
 
 use logos::{Lexer, Logos};
-use std::fmt;
+use std::{fmt, str::Chars};
 use std::num::IntErrorKind;
 
 use crate::{ConstantKind, LexingError, StringLiteral, StringLiteralCharset, Token, TokenKind};
@@ -49,7 +49,7 @@ fn int_error_to_diag(s: &str, kind: &IntErrorKind) -> String {
         IntErrorKind::NegOverflow => {
             format!("Negative overflow detected while parsing '{}' as u64", s).to_string()
         }
-        _ => panic!("This should never have branched"),
+        _ => unreachable!(),
     }
 }
 
@@ -94,26 +94,23 @@ fn parse_dec(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
     }
 }
 
-/// Lexes the string and parses it for metadata
-///
-/// This function parses the string's prefix and removes the enclosing quotes
-/// TODO: Merge when made up of several strings (e.g. {"toto" "tata"} => "toto tata")
-fn make_string_literal(lex: &mut Lexer<CToken>) -> StringLiteral {
-    let slice: &str = lex.slice();
-    let mut chars = slice.chars();
-
-    // Remove the closing quote
-    if chars.next_back().unwrap() != '"' {
-        panic!();
+fn charset_prefix_size(prefix: &StringLiteralCharset) -> usize {
+    match prefix {
+        StringLiteralCharset::U8 => 2,
+        _ => 1,
     }
+}
 
-    // Two possible values:
-    //   - a ", which we gladly skip
-    //   - some prefix
-    let prefix = chars.next().unwrap();
+/// Determines the charset to use and consumes the prefix
+/// up to, but not including, the opening double quote
+fn extract_charset(chars: &mut Chars) -> StringLiteralCharset {
+    let chars_clone = &mut chars.clone();
+    let prefix = chars_clone.next().unwrap();
+    let mut has_prefix = true;
+
     let charset = match prefix {
         'u' => {
-            let prefix = chars.next().unwrap();
+            let prefix = chars_clone.next().unwrap();
             match prefix {
                 '8' => StringLiteralCharset::U8,
                 _ => {
@@ -131,18 +128,27 @@ fn make_string_literal(lex: &mut Lexer<CToken>) -> StringLiteral {
             if prefix != '"' {
                 panic!();
             } else {
+                has_prefix = false;
                 StringLiteralCharset::U8
             }
         }
     };
 
-    // In this case, the iterator points to the first char in the string, not the opening double quote
-    // So, in every other case, skip the opening double quote
-    if charset != StringLiteralCharset::LowerU {
-        if chars.next().unwrap() != '"' {
-            panic!();
-        }
+    if has_prefix {
+        chars.nth(charset_prefix_size(&charset) - 1);
     }
+
+    charset
+}
+
+/// Lexes the string and parses it for metadata
+///
+/// This function parses the string's prefix and removes the enclosing quotes
+/// TODO: Merge when made up of several strings (e.g. {"toto" "tata"} => "toto tata")
+fn make_string_literal(lex: &mut Lexer<CToken>) -> StringLiteral {
+    let slice: &str = lex.slice().trim_end();
+    let mut chars = slice.chars();
+    let charset = extract_charset(&mut chars);
 
     StringLiteral {
         charset,
