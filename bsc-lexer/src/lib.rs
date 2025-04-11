@@ -1,5 +1,6 @@
 use std::{fmt::Debug, ops::Range};
 
+#[cfg(feature = "dummy")]
 pub mod dummy;
 
 /// An enum representing the different kinds of lexing errors.
