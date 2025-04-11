@@ -3,6 +3,9 @@ use std::{fmt::Debug, ops::Range};
 #[cfg(feature = "dummy")]
 pub mod dummy;
 
+#[cfg(feature = "logos")]
+pub mod logos;
+
 /// An enum representing the different kinds of lexing errors.
 ///
 /// Note that we do not store any data within the variants as
@@ -171,6 +174,9 @@ pub struct Token {
     span: Span,
 }
 
+/// Macro to convert an identifier to lowercase
+///
+/// This is used to convert an enum variant to lowercase for display purposes.
 macro_rules! lowercase {
     ($id:ident) => {
         format!("{:?}", $id).to_lowercase()
