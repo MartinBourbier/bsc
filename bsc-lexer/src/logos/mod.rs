@@ -10,7 +10,7 @@ use logos::{Lexer, Logos};
 use std::{fmt, str::Chars};
 use std::num::IntErrorKind;
 
-use crate::{ConstantKind, LexingError, StringLiteral, StringLiteralCharset, Token, TokenKind};
+use crate::{ConstantKind, ErrorKind, LexingError, StringLiteral, StringLiteralCharset, Token, TokenKind};
 
 macro_rules! lowercase {
     ($i:ident) => {
@@ -59,15 +59,13 @@ fn int_error_to_diag(s: &str, kind: &IntErrorKind) -> String {
 ///       It does not handle integer suffixes nor the exponent part.
 ///       It also does not handle the case where the number is too large to fit in an i32.
 fn parse_hex(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
-    use super::ErrorKind::*;
-
     let s = lex.slice();
     let s = s.trim_start_matches("0x").trim_start_matches("0X");
     let res = u64::from_str_radix(s, 16);
     match res {
         Ok(n) => Ok(IntegerConstant::INT(n)),
         Err(e) => Err(LexingError {
-            kind: InvalidIntegerConstant,
+            kind: ErrorKind::InvalidIntegerConstant,
             position: lex.span(),
             message: int_error_to_diag(s, e.kind()),
         }),
@@ -80,14 +78,12 @@ fn parse_hex(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
 ///       It does not handle integer suffixes nor the exponent part.
 ///       It also does not handle the case where the number is too large to fit in an i32.
 fn parse_dec(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
-    use super::ErrorKind::*;
-
     let s = lex.slice();
     let res = u64::from_str_radix(s, 10);
     match res {
         Ok(n) => Ok(IntegerConstant::INT(n)),
         Err(e) => Err(LexingError {
-            kind: InvalidIntegerConstant,
+            kind: ErrorKind::InvalidIntegerConstant,
             position: lex.span(),
             message: int_error_to_diag(s, e.kind()),
         }),
@@ -141,18 +137,70 @@ fn extract_charset(chars: &mut Chars) -> StringLiteralCharset {
     charset
 }
 
+fn extract_first_string(chars: &mut Chars) -> String {
+    assert!(chars.next().unwrap() == '"');
+
+    let mut s = String::new();
+    let mut found_quote = false;
+
+    for c in chars {
+        if c == '"' {
+            found_quote = true;
+            break;
+        }
+
+        s.push(c);
+    }
+
+    if !found_quote {
+        todo!();
+    }
+
+    s
+}
+
+/// Merge the contents of an interator of chars
+/// 
+/// The content of the iterator might be {"toto " "tata"}. In this case, we need
+/// to merge the strings, which will yield "toto tata".
+/// 
+/// Note: `chars` must point to the opening double quote of the first string, right
+/// after the prefix (if any).
+fn merge_string(chars: &mut Chars) -> Result<String, LexingError> {
+    let mut s = String::new();
+
+    for _ in 0..2 {
+        s.push_str(&extract_first_string(chars));
+
+        println!("{}", s);
+
+        for c in chars.clone() {
+            if c != ' ' {
+                break;
+            }
+        }
+    }
+
+    println!("{s}");
+
+    Ok("".to_string())
+}
+
 /// Lexes the string and parses it for metadata
 ///
 /// This function parses the string's prefix and removes the enclosing quotes
-/// TODO: Merge when made up of several strings (e.g. {"toto" "tata"} => "toto tata")
-fn make_string_literal(lex: &mut Lexer<CToken>) -> StringLiteral {
+fn make_string_literal(lex: &mut Lexer<CToken>) -> Result<StringLiteral, LexingError> {
     let slice: &str = lex.slice().trim_end();
     let mut chars = slice.chars();
     let charset = extract_charset(&mut chars);
 
-    StringLiteral {
-        charset,
-        value: chars.collect(),
+    if let Ok(s) = merge_string(&mut chars) {
+        Ok(StringLiteral {
+            charset,
+            value: s
+        })
+    } else {
+        Err(LexingError { kind: ErrorKind::UnterminatedString, position: lex.span(), message: "unterminated string".to_string() })
     }
 }
 
