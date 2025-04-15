@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 bsc-lexer = { path = "../bsc-lexer", features = ["dummy", "logos"] }
+bsc-parse = { path = "../bsc-parse" }
