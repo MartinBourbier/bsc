@@ -25,10 +25,10 @@ pub enum IntegerConstant {
     INT(u64),
 }
 
-impl Into<ConstantKind> for IntegerConstant {
-    fn into(self) -> ConstantKind {
-        match self {
-            Self::INT(n) => ConstantKind::Integer(n),
+impl From<IntegerConstant> for ConstantKind {
+    fn from(val: IntegerConstant) -> Self {
+        match val {
+            IntegerConstant::INT(n) => ConstantKind::Integer(n),
         }
     }
 }
@@ -79,7 +79,7 @@ fn parse_hex(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
 ///       It also does not handle the case where the number is too large to fit in an i32.
 fn parse_dec(lex: &mut Lexer<CToken>) -> Result<IntegerConstant, LexingError> {
     let s = lex.slice();
-    let res = u64::from_str_radix(s, 10);
+    let res = s.parse::<u64>();
     match res {
         Ok(n) => Ok(IntegerConstant::INT(n)),
         Err(e) => Err(LexingError {
@@ -148,7 +148,7 @@ fn merge_string(chars: &mut Chars) -> String {
     let mut s = String::new();
 
     loop {
-        if chars.find(|&c| c == '"') == None {
+        if chars.find(|&c| c == '"').is_none() {
             break;
         }
 
@@ -530,7 +530,7 @@ pub struct LogosLexer<'a> {
     lexer: Lexer<'a, CToken>,
 }
 
-impl<'a> Iterator for LogosLexer<'a> {
+impl Iterator for LogosLexer<'_> {
     type Item = super::LexerIteratorItem;
 
     fn next(&mut self) -> Option<Self::Item> {
