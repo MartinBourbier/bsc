@@ -1,4 +1,4 @@
-use crate::{ConstantKind, ErrorKind, Lexer, LexerIteratorItem, LexingError, Token, TokenKind};
+use crate::{ConstantKind, ErrorKind, Lexer, LexerIteratorItem, LexingError, TokenKind};
 
 /// A dummy lexer that tokenizes **only** integer constants.
 ///
@@ -31,10 +31,11 @@ impl Iterator for DummyLexer<'_> {
         }
 
         if let Ok(number) = token_str.parse::<u64>() {
-            Some(Ok(Token {
-                kind: TokenKind::Constant(ConstantKind::Integer(number)),
-                span: start..(self.cursor - 1),
-            }))
+            Some(Ok((
+                start,
+                TokenKind::Constant(ConstantKind::Integer(number)),
+                self.cursor - 1,
+            )))
         } else {
             Some(Err(LexingError {
                 kind: ErrorKind::InvalidIntegerConstant,
@@ -61,10 +62,7 @@ mod tests {
 
     macro_rules! spanned_token {
         ($kind:expr,$span:expr) => {
-            Token {
-                kind: $kind,
-                span: $span,
-            }
+            ($span.start, $kind, $span.end)
         };
     }
 

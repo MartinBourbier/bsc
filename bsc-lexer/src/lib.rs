@@ -43,7 +43,7 @@ pub struct LexingError {
 /// This is probably not complete. For example, integers might
 /// be signed or unsigned, need less precision, etc.
 /// The same goes for floats.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ConstantKind {
     Integer(u64),
     Float(f64),
@@ -64,7 +64,7 @@ pub struct StringLiteral {
 }
 
 /// An enum representing the different kinds of tokens.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TokenKind {
     // Keywords
     Alignas,       // _Aliagnas
@@ -168,12 +168,6 @@ pub enum TokenKind {
     TernaryOp,        // ?
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Token {
-    kind: TokenKind,
-    span: Span,
-}
-
 macro_rules! lowercase {
     ($id:ident) => {
         format!("{:?}", $id).to_lowercase()
@@ -191,7 +185,7 @@ impl std::fmt::Display for TokenKind {
     }
 }
 
-pub type LexerIteratorItem = Result<Token, LexingError>;
+pub type LexerIteratorItem = Result<(usize, TokenKind, usize), LexingError>;
 
 /// A trait for lexers that can tokenize input strings.
 ///
