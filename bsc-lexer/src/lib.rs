@@ -60,7 +60,7 @@ pub enum StringLiteralCharset {
 #[derive(Clone, Debug, PartialEq)]
 pub struct StringLiteral {
     charset: StringLiteralCharset,
-    value: String,
+    pub value: String,
 }
 
 /// An enum representing the different kinds of tokens.
