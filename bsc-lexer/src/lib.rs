@@ -6,6 +6,9 @@ pub mod dummy;
 #[cfg(feature = "logos")]
 pub mod logos;
 
+#[cfg(feature = "stb")]
+pub mod stb;
+
 /// An enum representing the different kinds of lexing errors.
 ///
 /// Note that we do not store any data within the variants as

@@ -2,7 +2,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let libdir_path = PathBuf::from("stb_c_lexer/")
+    let libdir_path = PathBuf::from("src/stb/stb_c_lexer/")
         .canonicalize()
         .expect("cannot canonicalize path");
 
