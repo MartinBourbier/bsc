@@ -4,7 +4,7 @@
 
 use std::alloc::Layout;
 
-use crate::LexerIteratorItem;
+use crate::{LexerIteratorItem, TokenKind};
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -46,21 +46,75 @@ impl<'source> StbLexer<'source> {
 }
 
 impl Iterator for StbLexer<'_> {
-    type Item = LexerIteratorItem;
+    type Item = super::LexerIteratorItem;
 
     fn next(&mut self) -> Option<Self::Item> {
         let token_id = unsafe { stb_c_lexer_get_token(self.ptr) };
 
         match token_id as u32 {
+            CLEX_eof => None,
+            CLEX_parse_error => Some(Err(unimplemented!())),
             x if x < 256 => match x as u8 {
-                b'+' => todo!(),
-                b'-' => todo!(),
-                _ => todo!(),
+                b'+' => Some(Ok((0, TokenKind::Plus, 0))),
+                b'-' => Some(Ok((0, TokenKind::Minus, 0))),
+                b'/' => Some(Ok((0, TokenKind::Div, 0))),
+                b'*' => Some(Ok((0, TokenKind::Star, 0))),
+                b'%' => Some(Ok((0, TokenKind::Mod, 0))),
+                b'=' => Some(Ok((0, TokenKind::Assign, 0))),
+                b'&' => Some(Ok((0, TokenKind::Ampersand, 0))),
+                b'|' => Some(Ok((0, TokenKind::BinaryOr, 0))),
+                b'^' => Some(Ok((0, TokenKind::Xor, 0))),
+                b'>' => Some(Ok((0, TokenKind::GreaterThan, 0))),
+                b'<' => Some(Ok((0, TokenKind::LessThan, 0))),
+                b',' => Some(Ok((0, TokenKind::Comma, 0))),
+                b';' => Some(Ok((0, TokenKind::Semicolon, 0))),
+                b'(' => Some(Ok((0, TokenKind::LeftParen, 0))),
+                b')' => Some(Ok((0, TokenKind::RightParen, 0))),
+                b'[' => Some(Ok((0, TokenKind::LeftBracket, 0))),
+                b']' => Some(Ok((0, TokenKind::RightBracket, 0))),
+                b'{' => Some(Ok((0, TokenKind::LeftBrace, 0))),
+                b'}' => Some(Ok((0, TokenKind::RightBrace, 0))),
+                _ => Some(Err(unimplemented!())),
             },
-            CLEX_intlit => todo!(),
-            CLEX_floatlit => todo!(),
-            CLEX_id => todo!(),
-            // and many others
+            CLEX_intlit => Some(Ok((
+                0,
+                TokenKind::Constant(crate::ConstantKind::Integer(todo!())),
+                0,
+            ))),
+            CLEX_floatlit => Some(Ok((
+                0,
+                TokenKind::Constant(crate::ConstantKind::Float(todo!())),
+                0,
+            ))),
+            CLEX_id => Some(Ok((0, TokenKind::Identifier(todo!()), 0))),
+            CLEX_dqstring => Some(Ok((0, todo!("What is that exactly ?"), 0))),
+
+            /* TODO these are not treated (I mean, even less so than the ones before)
+            CLEX_charlit => Some(Ok((0, todo!(), 0))),
+            CLEX_EQ => Some(Ok((0, todo!(), 0))),
+            CLEX_NOTEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_LESSEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_GREATEREQ => Some(Ok((0, todo!(), 0))),
+            CLEX_ANDAND => Some(Ok((0, todo!(), 0))),
+            CLEX_OROR => Some(Ok((0, todo!(), 0))),
+            CLEX_SHL => Some(Ok((0, todo!(), 0))),
+            CLEX_SHR => Some(Ok((0, todo!(), 0))),
+            CLEX_PLUSPLUS => Some(Ok((0, todo!(), 0))),
+            CLEX_MINUSMINUS => Some(Ok((0, todo!(), 0))),
+            CLEX_PLUSEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_MINUSEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_MULEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_DIVEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_MODEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_ANDEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_OREQ => Some(Ok((0, todo!(), 0))),
+            CLEX_XOREQ => Some(Ok((0, todo!(), 0))),
+            CLEX_ARROW => Some(Ok((0, todo!(), 0))),
+            CLEX_EQARROW => Some(Ok((0, todo!(), 0))),
+            CLEX_SHLEQ => Some(Ok((0, todo!(), 0))),
+            CLEX_SHREQ => Some(Ok((0, todo!(), 0))),
+            CLEX_FIRST_UNUSED_TOKEN => Some(Ok((0, todo!(), 0))),
+            */
             _ => Some(Err(unimplemented!(
                 "Getting location might not be trivial yet"
             ))),
