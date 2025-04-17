@@ -3,8 +3,10 @@ name = "bsc-lexer"
 version = "0.1.0"
 edition = "2024"
 
-[build-dependencies]
+[dependencies]
 logos = { version = "0.15.0", optional = true }
+
+[build-dependencies]
 bindgen = "0.71.1"
 
 [features]
