@@ -6,6 +6,9 @@ edition = "2024"
 [dependencies]
 logos = { version = "0.15.0", optional = true }
 
+[build-dependencies]
+bindgen = "0.71.1"
+
 [features]
 dummy = []
-
+stb = []
