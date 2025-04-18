@@ -1,17 +1,28 @@
-use bsc_lexer::{Lexer, dummy::DummyLexer, logos::LogosLexer};
+use bsc_lexer::{Lexer, logos::LogosLexer};
+use bsc_parse::grammar;
 
 fn main() {
-    let input = "123 456 789";
-    let dummy_lexer = DummyLexer::new(input);
+    // let mut errors = Vec::new();
+    // let res = grammar::TranslationUnitParser::new()
+    //     .parse(
+    //         &mut errors,
+    //         LogosLexer::new(r#"(_Generic (toto, default : test))"#),
+    //     )
+    //     .unwrap();
 
-    for tok in dummy_lexer {
-        println!("{:?}", tok);
-    }
+    // println!("{:?}", errors);
+    // println!("{}", res);
+    // println!("{:?}", res);
 
-    let input = r#"int main(void) { printf(u8"Hello," " World!\n"); return 42; }"#;
-    let logos_lexer = LogosLexer::new(input);
+    let mut errors = Vec::new();
+    let res = grammar::PointerParser::new()
+        .parse(
+            &mut errors,
+            LogosLexer::new(r#"*"#),
+        )
+        .unwrap();
 
-    for tok in logos_lexer {
-        println!("{:?}", tok);
-    }
+    println!("{:?}", errors);
+    println!("{}", res);
+    println!("{:?}", res);
 }
