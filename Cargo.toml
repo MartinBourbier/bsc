@@ -1,5 +1,5 @@
 [workspace]
 members = [
-  "bsc", "bsc-lexer",
+  "bsc", "bsc-lexer", "bsc-parse",
 ]
 resolver = "3"

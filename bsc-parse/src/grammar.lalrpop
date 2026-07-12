@@ -1,0 +1,271 @@
+use bsc_lexer::{LexingError, TokenKind};
+use crate::ast::*;
+use lalrpop_util::ErrorRecovery;
+
+grammar<'err>(errors: &'err mut Vec<ErrorRecovery<usize, TokenKind, LexingError>>);
+
+/// Generic list parsing
+///
+/// T: The rule to parse
+/// d: The delimiter
+GenericList<T, d>: Vec<T> = {
+    <mut v:(<T> d)*> <e:T> => { v.push(e); v }
+}
+
+/// Generic list specialization on ","
+Comma<T> = GenericList<T, ",">;
+
+pub TranslationUnit = <PrimaryExpr>;
+
+PrimaryExpr: P<Expr> = {
+    <l:@L> <i:id> <r:@R> => P(Expr::Identifier(l..r, i)),
+    <l:@L> <c:Constant> <r:@R> => P(Expr::Constant(l..r, c)),
+    <l:@L> <li:Literal> <r:@R> => P(Expr::Literal(l..r, li)),
+    "(" <Expr> ")",
+    <GenericSelection>,
+}
+
+GenericSelection: P<Expr> = {
+    <l:@L> generic "(" <ae:AssignmentExpr> "," <al:Comma<GenericAssociation>> ")" <r:@R> => {
+        P(Expr::GenericSelection(l..r, ae, al))
+    },
+}
+
+GenericAssociation: P<GenericAssociation> = {
+    <l:@L> <ty:TypeName> ":" <ae:AssignmentExpr> <r:@R> => {
+        P(GenericAssociation { span: l..r, association_ty: AssociationTy::Ty(ty), expr: ae })
+    },
+    <l:@L> default ":" <ae:AssignmentExpr> <r:@R> => {
+        P(GenericAssociation { span: l..r, association_ty: AssociationTy::Default, expr: ae })
+    },
+}
+
+Constant: P<Constant> = {
+    int_lit => P(Constant::Integer(<>))
+}
+
+Literal: P<StringLiteral> = {
+    <l:lit> => P(StringLiteral::StringLiteral(l.value)),
+    func_name => P(StringLiteral::FuncName)
+}
+
+Expr: P<Expr> = {
+    <l:@L> <v:Comma<AssignmentExpr>> <r:@R> => P(Expr::Seq(l..r, v)),
+}
+
+AssignmentExpr: P<Expr> = {
+    <ConditionalExpr>,
+}
+
+ConditionalExpr: P<Expr> = {
+    <LogicalOrExpr>,
+    <l:@L> <cond:LogicalOrExpr> "?" <true_case:Expr> ":" <false_case:ConditionalExpr> <r:@R> => P(Expr::Ternary(l..r, cond, true_case, false_case)),
+}
+
+LogicalOrExpr: P<Expr> = {
+    <LogicalAndExpr>,
+    <l:@L> <left:LogicalOrExpr> "||" <right:LogicalAndExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::LogicalOr, left, right)),
+}
+
+LogicalAndExpr: P<Expr> = {
+    <InclusiveOrExpr>,
+    <l:@L> <left:LogicalAndExpr> "&&" <right:InclusiveOrExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::LogicalAnd, left, right)),
+}
+
+InclusiveOrExpr: P<Expr> = {
+    <ExclusiveOrExpr>,
+    <l:@L> <left:InclusiveOrExpr> "|" <right:ExclusiveOrExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::BitwiseOr, left, right)),
+}
+
+ExclusiveOrExpr: P<Expr> = {
+    <AndExpr>,
+    <l:@L> <left:ExclusiveOrExpr> "^" <right:AndExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::BitwiseXor, left, right)),
+}
+
+AndExpr: P<Expr> = {
+    <EqualityExpr>,
+    <l:@L> <left:AndExpr> "&" <right:EqualityExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::BitwiseAnd, left, right)),
+}
+
+EqualityExpr: P<Expr> = {
+    <RelationalExpr>,
+    <l:@L> <left:EqualityExpr> "==" <right:RelationalExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Eq, left, right)),
+    <l:@L> <left:EqualityExpr> "!=" <right:RelationalExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Neq, left, right)),
+}
+
+RelationalExpr: P<Expr> = {
+    <ShiftExpr>,
+    <l:@L> <left:RelationalExpr> "<" <right:ShiftExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Less, left, right)),
+    <l:@L> <left:RelationalExpr> ">" <right:ShiftExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Great, left, right)),
+    <l:@L> <left:RelationalExpr> "<=" <right:ShiftExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::LessEq, left, right)),
+    <l:@L> <left:RelationalExpr> ">=" <right:ShiftExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::GreatEq, left, right)),
+}
+
+ShiftExpr: P<Expr> = {
+    <AdditiveExpr>,
+    <l:@L> <left:ShiftExpr> "<<" <right:AdditiveExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::ShiftLeft, left, right)),
+    <l:@L> <left:ShiftExpr> ">>" <right:AdditiveExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::ShiftRight, left, right)),
+}
+
+AdditiveExpr: P<Expr> = {
+    <MultiplcativeExpr>,
+    <l:@L> <left:AdditiveExpr> "+" <right:MultiplcativeExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Add, left, right)),
+    <l:@L> <left:AdditiveExpr> "-" <right:MultiplcativeExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Sub, left, right)),
+}
+
+MultiplcativeExpr: P<Expr> = {
+    <CastExpr>,
+    <l:@L> <left:MultiplcativeExpr> "*" <right:CastExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Mul, left, right)),
+    <l:@L> <left:MultiplcativeExpr> "/" <right:CastExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Div, left, right)),
+    <l:@L> <left:MultiplcativeExpr> "%" <right:CastExpr> <r:@R> => P(Expr::BinOp(l..r, BinOpKind::Mod, left, right)),
+}
+
+CastExpr: P<Expr> = {
+    <UnaryExpr>,
+    // TODO: cast expr
+}
+
+UnaryExpr: P<Expr> = {
+    <PostfixExpr>,
+    <l:@L> "++" <e:UnaryExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::PreInc, e)),
+    <l:@L> "--" <e:UnaryExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::PreDec, e)),
+    <l:@L> "&" <e:CastExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Ref, e)),
+    <l:@L> "*" <e:CastExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Deref, e)),
+    <l:@L> "+" <e:CastExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Plus, e)),
+    <l:@L> "-" <e:CastExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Minus, e)),
+    <l:@L> "~" <e:CastExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Neg, e)),
+    <l:@L> "!" <e:CastExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Not, e)),
+    <l:@L> sizeof <e:UnaryExpr> <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::Sizeof, e)),
+    // TODO: sizeof(typename) and alignof(typename)
+}
+
+PostfixExpr: P<Expr> = {
+    <PrimaryExpr>,
+    <l:@L> <p:PostfixExpr> "[" <e:Expr> "]" <r:@R> => P(Expr::Index(l..r, p, e)),
+    <l:@L> <p:PostfixExpr> "(" ")" <r:@R> => P(Expr::Call(l..r, p, None)),
+    <l:@L> <p:PostfixExpr> "(" <args:Comma<AssignmentExpr>> ")" <r:@R> => P(Expr::Call(l..r, p, Some(args))),
+    <l:@L> <p:PostfixExpr> "." <i:id> <r:@R> => P(Expr::Access(l..r, false, p, i)),
+    <l:@L> <p:PostfixExpr> "->" <i:id> <r:@R> => P(Expr::Access(l..r, true, p, i)),
+    <l:@L> <p:PostfixExpr> "++" <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::PostInc, p)),
+    <l:@L> <p:PostfixExpr> "--" <r:@R> => P(Expr::UnaryOp(l..r, UnaryOpKind::PostDec, p)),
+    // <l:@L> "(" <ty:TypeName> ")" "{"  "}" =>
+}
+
+TypeSpecifier: P<TypeSpecifier> = {
+    void => P(TypeSpecifier::Void),
+    char => P(TypeSpecifier::Char),
+    short => P(TypeSpecifier::Short),
+    int => P(TypeSpecifier::Int),
+    long => P(TypeSpecifier::Long),
+    float => P(TypeSpecifier::Float),
+    double => P(TypeSpecifier::Double),
+    signed => P(TypeSpecifier::Signed),
+    unsigned => P(TypeSpecifier::Unsigned),
+    bool => P(TypeSpecifier::Bool),
+    complex => P(TypeSpecifier::Complex),
+    imaginary => P(TypeSpecifier::Imaginary),
+}
+
+TypeQualifier: P<TypeQualifier> = {
+    const => P(TypeQualifier::Const),
+    restrict => P(TypeQualifier::Restrict),
+    volatile => P(TypeQualifier::Volatile),
+    atomic => P(TypeQualifier::Atomic),
+}
+
+SpecifierQualifierList: P<SpecifierQualifierList> = {
+    <ts:TypeSpecifier> <mut sql:SpecifierQualifierList> => {
+        sql.specifiers.push(ts);
+        sql
+    },
+    <ts:TypeSpecifier> => P(SpecifierQualifierList { specifiers: vec![ts], qualifiers: vec![] }),
+    <tq:TypeQualifier> <mut sql:SpecifierQualifierList> => {
+        sql.qualifiers.push(tq);
+        sql
+    },
+    <tq:TypeQualifier> => P(SpecifierQualifierList { specifiers: vec![], qualifiers: vec![tq] }),
+}
+
+Pointer: P<Pointer> = {
+    "*" <quals:TypeQualifier+> <mut p:Pointer> => {
+        p.indirections.push(Indirection { qualifiers: quals });
+        p
+    },
+    "*" <TypeQualifier+> => P(Pointer { indirections: vec![Indirection { qualifiers: <> }] }),
+    "*" <mut p:Pointer> => { p.indirections.push(Indirection::default()); p },
+    "*" => P(Pointer { indirections: vec![Indirection::default()] })
+}
+
+AbstractDeclarator: P<AbstractDeclarator> = {
+    <Pointer> => P(AbstractDeclarator::Ptr(<>)),
+}
+
+// TODO: handle direct abstract declarators
+
+TypeName: P<Ty> = {
+    <sql:SpecifierQualifierList> <ad:AbstractDeclarator> => P(Ty { specifier_qualifier_list: sql, abstract_declarator: Some(ad) }),
+    <SpecifierQualifierList> => P(Ty { specifier_qualifier_list: <>, abstract_declarator: None }),
+}
+
+extern {
+    type Location = usize;
+    type Error = bsc_lexer::LexingError;
+
+    enum TokenKind {
+        atomic    => TokenKind::Atomic,
+        bool      => TokenKind::PrimitiveBool,
+        char      => TokenKind::Char,
+        complex   => TokenKind::Complex,
+        const     => TokenKind::Const,
+        default   => TokenKind::Default,
+        double    => TokenKind::Double,
+        float     => TokenKind::Float,
+        func_name => TokenKind::FuncName,
+        generic   => TokenKind::Generic,
+        id        => TokenKind::Identifier(<String>),
+        imaginary => TokenKind::Imaginary,
+        int       => TokenKind::Int,
+        int_lit   => TokenKind::Constant(bsc_lexer::ConstantKind::Integer(<u64>)),
+        lit       => TokenKind::StringLiteral(<bsc_lexer::StringLiteral>),
+        long      => TokenKind::Long,
+        restrict   => TokenKind::Restrict,
+        short     => TokenKind::Short,
+        signed    => TokenKind::Signed,
+        sizeof    => TokenKind::Sizeof,
+        unsigned  => TokenKind::Unsigned,
+        void      => TokenKind::Void,
+        volatile  => TokenKind::Volatile,
+        "!"       => TokenKind::Bang,
+        "!="      => TokenKind::NotEqual,
+        "%"       => TokenKind::Mod,
+        "&"       => TokenKind::Ampersand,
+        "&&"      => TokenKind::LogicalAnd,
+        "("       => TokenKind::LeftParen,
+        ")"       => TokenKind::RightParen,
+        "*"       => TokenKind::Star,
+        "+"       => TokenKind::Plus,
+        "+"       => TokenKind::Plus,
+        "++"      => TokenKind::Inc,
+        ","       => TokenKind::Comma,
+        "-"       => TokenKind::Minus,
+        "--"      => TokenKind::Dec,
+        "->"      => TokenKind::PointerAccess,
+        "."       => TokenKind::Dot,
+        "/"       => TokenKind::Div,
+        ":"       => TokenKind::Colon,
+        "<"       => TokenKind::LessThan,
+        "<<"      => TokenKind::LeftShift,
+        "<="      => TokenKind::LessThanEqual,
+        "=="      => TokenKind::Equal,
+        ">"       => TokenKind::GreaterThan,
+        ">="      => TokenKind::GreaterThanEqual,
+        ">>"      => TokenKind::RightShift,
+        "?"       => TokenKind::TernaryOp,
+        "["       => TokenKind::LeftBracket,
+        "]"       => TokenKind::RightBracket,
+        "^"       => TokenKind::Xor,
+        "|"       => TokenKind::BinaryOr,
+        "||"      => TokenKind::LogicalOr,
+        "~"       => TokenKind::Neg,
+    }
+}
